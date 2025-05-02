@@ -82,17 +82,17 @@
   (length! backend (compile-expr! backend (second obj))))
 
 (define-method (compile-expr! (backend any-object?) (obj (form 'ref)))
-  (let* ((var   (second obj))
-         (dims  (drop obj 2))
-         (dims^ (map (cut compile-expr! backend <>) dims)))
-    (assert (symbol? var))
-    (reference! backend var dims^)))
+  (pmatch obj
+    ((ref (? var) (?? dims))
+     (reference! backend var (map (cut compile-expr! backend <>) dims)))))
 
 (define (define-binop name op)
   (define-method (compile-expr! (backend any-object?) (app (form name)))
-    (let ((left  (compile-expr! backend (second app)))
-          (right (compile-expr! backend (third app))))
-      (op backend left right))))
+    (pmatch app
+      ((,name (? left) (? right))
+       (op backend
+           (compile-expr! backend left)
+           (compile-expr! backend right))))))
 
 (define-binop '+   add!)
 (define-binop '*   multiply!)
@@ -103,27 +103,30 @@
 
 (define-method (compile-statement! (backend any-object?) (obj (form 'declare)))
   (pmatch obj
-    ((declare (? var) . (? dims))
-     (assert (symbol? var))
+    ((declare (? var) (?? dims))
      (declare! backend var (map (cut compile-expr! backend <>) dims)))))
 
 (define-method (compile-statement! (backend any-object?) (obj (form 'set!)))
-  (let* ((var      (second obj))
-         (indicies (map (cut compile-expr! backend <>) (third obj)))
-         (value    (compile-expr! backend (fourth obj))))
-    (assign! backend var indicies value)))
+  (pmatch obj
+    ((set! (? var) (? indicies) (? value))
+     (assign! backend
+              var
+              (map (cut compile-expr! backend <>) indicies)
+              (compile-expr! backend (fourth obj))))))
 
 (define-method (compile-statement! (backend any-object?) (obj (form 'if)))
   (pmatch obj
     ((if (? condition) (? consequences) (? alternatives))
-     (if! (compile-expr! backend condition)
+     (if! backend
+          (compile-expr! backend condition)
           (lambda () (compile-block! backend consequences))
           (lambda () (compile-block! backend alternatives))))))
 
 (define-method (compile-statement! (backend any-object?) (obj (form 'for)))
   (pmatch obj
-    ((for (? var) (? mn) (? mx) . (? st))
-     (for! var
+    ((for (? var) (? mn) (? mx) (?? st))
+     (for! backend
+           var
            (compile-expr! backend mn)
            (compile-expr! backend mx)
            (lambda () (compile-block! backend st))))))
