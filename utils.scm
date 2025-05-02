@@ -17,6 +17,8 @@ Shorthand for a few common patterns
                                  (lambda (arg ...)
                                    body ...))))))
 
+(manage 'add 'generic-procedures)
+
 (define-syntax define-method
   (syntax-rules ()
     ((define-method (name (arg arg-type) ...)
@@ -33,3 +35,24 @@ Shorthand for a few common patterns
      (define (is-that-sym? obj) (pred obj sym))
      (register-predicate! is-that-sym? `(marker ,sym))
      is-that-sym?)))
+
+(register-predicate! list? 'list)
+
+(define (form obj)
+  (is-pair-of
+   (if (predicate? obj) obj (lit obj))
+   list?))
+
+(manage 'add 'term-rewriting)
+
+(define-syntax pmatch
+  (syntax-rules ()
+    ((pmatch obj)
+     (error 'pmatch "No pattern matched" obj))
+    ((pmatch obj (pat res ...) more ...)
+     ((rule `pat (begin res ...))
+      obj
+      (lambda (x y) x)
+      (lambda ()
+        (pmatch obj
+          more ...))))))
