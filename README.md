@@ -12,7 +12,7 @@ ArrayLit    := (array ArrayLitObj)
 ArrayLitObj := Literal | (ArrayLitObj ...)
 Expr        := Call | Literal | ArrayLit
 Op          := + | * | - | / | Min | Max
-Call        := (Op Expr Expr ...)
+Call        := (Op Expr Expr)
              | (filter Expr Expr Expr)
              | (iota Expr)
              | (ref Expr Expr)
@@ -28,7 +28,7 @@ The SCARY middle-end language has the following syntax:
 
 ```
 Expr        := Literal | Variable | Func-Call | Index
-Func-Call   := (Op Expr ...)
+Func-Call   := (Op Expr Expr) | (length Expr)
 Index       := (ref Variable Expr ...)
 Init        := (declare Variable Expr ...)
 Assignment  := (set! Variable (Expr ...) Expr)
