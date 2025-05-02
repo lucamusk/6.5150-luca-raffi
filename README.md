@@ -32,7 +32,9 @@ Func-Call   := (Op Expr ...)
 Index       := (ref Variable Expr ...)
 Init        := (declare Variable Expr ...)
 Assignment  := (set! Variable (Expr ...) Expr)
-Statement   := Expr | Assignment | Init | Conditional | Loop | Begin
+Statement   := Read | Write | Assignment | Init | Conditional | Loop
+Read        := (read Variable Number)
+Write       := (write Expr)
 Conditional := (if Expr (Statement ...) (Statement ...))
 Loop        := (for Variable Expr_min Expr_max Statement ...)
 ```
