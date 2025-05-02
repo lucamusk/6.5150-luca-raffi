@@ -28,9 +28,10 @@
 (define-generic (reference! backend var dims))
 
 ;; Emits a declaration
-;;  EXPRESSIONS are a list of rvalues
+;;   VAR is an lvalue which is to be declared
+;;   EXPRESSIONS are a list of rvalues
 ;; Returns nothing of importance
-(define-generic (declare! backend expressions))
+(define-generic (declare! var backend expressions))
 
 ;; Emits an assignment statment
 ;;  VAR is an lvalue which is to be written to
@@ -104,7 +105,7 @@
   (pmatch obj
     ((declare (? var) . (? dims))
      (assert (symbol? var))
-     (declare! var (map (cut compile-expr! backend <>) dims)))))
+     (declare! backend var (map (cut compile-expr! backend <>) dims)))))
 
 (define-method (compile-statement! (backend any-object?) (obj (form 'set!)))
   (let* ((var      (second obj))
