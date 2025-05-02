@@ -42,12 +42,15 @@
        (pp "cool"))))
 
 (run-matcher
- (match:compile-pattern `(pp "wow"))
- `(pp "wow")
+ (match:compile-pattern `((? b) 2 3))
+ `(1 2 3)
  match:bindings)
 
 (define (true-succ tree curr)
   #t)
+
+(define (id-succ tree curr)
+  curr)
 
 (define (debug-succ tree curr)
   (pp curr)
@@ -68,6 +71,7 @@
     (traverse-tree tree)))
 
 (search-tree `((b 0 (1 2 0)) a (1 (b 3))) `((? b) 3) true-succ)
+(search-tree `(for i 0 10 (for j 0 10 ((pp 'h)))) `(for j (? l) (? h) (? b)) true-succ)
 
 ;;; Performs a deep copy of a given tree, with transformations
 ;;; done on the first or all elements matching the given
@@ -80,8 +84,12 @@
           current
           (if (run-matcher pattern-compiled current match:bindings)
               (begin
-		(set! matched? #t)
-                (transformer current))
+		(let ((transformed (transformer current)))
+		  ;;; We match on the first pattern match that we
+		  ;;; also transform. This enables transformers to
+		  ;;; do their own pattern matching 
+		  (set! matched? (not (equal? current transformed)))
+                  (transformer current)))
 	      (if (pair? current)
 		  (let ((v (traverse-tree (car current)))) ;;; Dig down
                     (cons v (traverse-tree (cdr current)))) ;;; Dig across
@@ -207,13 +215,24 @@
 (define top-level
   `(? code))
 
-(define test-blocks
+;;; Simple block test
+(define test-blocks-1
   `((for i 0 10 (
 		 (pp i)
 		 (pp "hey")))))
 
-(optimize-at test-blocks (block `(for i 0 10 (? block)) 4 `(pp i)) (lambda (c) 'cool) #f) 
-;;; -> ((for i 0 10 (cool (pp "hey"))))
+(optimize-at test-blocks-1 (block `(for i 0 10 (? block)) 4 `(pp i)) (lambda (c) 'cool) #f)
+
+;;; Ensures if we match 1 block but not its contents, we still keep matching
+(define test-blocks-2
+  `((for i 0 10 (
+		 (pp "wow")))
+    (for i 0 10 (
+		 (pp i)
+		 (pp "hey")))))
+
+(optimize-at test-blocks-2 (block `(for i 0 10 (? block)) 4 `(pp i)) (lambda (c) 'cool) #f) 
+;;; -> ((for i 0 10 ((pp "wow"))) (for i 0 10 (cool (pp "hey"))))
 
 
 (define (rename var new)
@@ -353,3 +372,116 @@
 (optimize-at lf-test-6 top-level (loop-fuser 'i 'j) #f)
 ;;; -> ((for i 0 10 ((pp i) (pp i i i))))
 
+(define (loop-tile tile-factor)
+  (define optimizer (make-pattern-operator))
+  ;;; Where the bounds are equal
+  (attach-rule! optimizer
+                (rule `(((?? a)
+                         (for (? loop-var) (? bound-low, number?) (? bound-high, number?) (? body))
+                         (?? b)))
+                      `(,@a
+                        (for ,loop-var 0 ,(/ (- bound-high bound-low) tile-factor)
+                             (for ,(symbol loop-var loop-var)
+				  (* ,loop-var ,tile-factor)
+				  (+ (* ,loop-var ,tile-factor) ,tile-factor)
+				  ,(optimize-at body loop-var
+					    (rename loop-var (symbol loop-var loop-var))
+					    #t)))
+                        ,@b)))
+  (attach-rule! optimizer
+                (rule `(((?? a)
+                         (for (? loop-var) (? bound-low) (? bound-high) (? body))
+                         (?? b)))
+                      `(,@a
+                        (for ,loop-var 0 (/ (- ,bound-high ,bound-low) ,tile-factor)
+                             (for ,(symbol loop-var loop-var)
+				  (* ,loop-var ,tile-factor)
+				  (+ (* ,loop-var ,tile-factor) ,tile-factor)
+				  ,(optimize-at body loop-var
+					    (rename loop-var (symbol loop-var loop-var))
+					    #t)))
+                        ,@b)))			     
+  optimizer)
+
+(define lt-test-1
+  `((for i 0 10
+	 (pp i))))
+(optimize-at lt-test-1 top-level (loop-tile 5) #f)
+;;; -> ((for i 0 2 (for ii (* i 5) (+ (* i 5) 5) (pp ii))))
+
+
+(define lt-test-2
+  `((for i x y
+	 (pp i))))
+(optimize-at lt-test-2 top-level (loop-tile 5) #f)
+;;; -> ((for i 0 (/ (- y x) 5) (for ii (* i 5) (+ (* i 5) 5) (pp ii))))
+
+(define (loop-reorder outer-loop-var inner-loop-var)
+  ;;; More complicated since we need to bring data
+  ;;; into shallower scopes
+  (lambda (c)
+    (define (at-loop outer-loop)
+      (let (
+	    (bound-low-o (caddr outer-loop))
+	    (bound-high-o (cadddr outer-loop))
+	    (inner-loop (search-tree outer-loop
+				     `(for ,inner-loop-var (? bound-low-i) (? bound-high-i) (? body-i))
+				     id-succ)))
+	(if (equal? inner-loop #f)
+	    outer-loop ;;; Not a match, keep searching
+	    (let ((bound-low-i (caddr inner-loop))
+		  (bound-high-i (cadddr inner-loop)))
+	      (define optimizer-inner (make-pattern-operator))
+	      (attach-rule! optimizer-inner
+			    (rule `((for ,inner-loop-var (? bound-low-i) (? bound-high-i)
+					  (? body-i)))
+				  `(for ,outer-loop-var ,bound-low-o ,bound-high-o ,body-i)))
+				    
+	      (define optimizer-outer (make-pattern-operator))
+	      (attach-rule! optimizer-outer
+			    (rule `((?? a)
+				     (for ,outer-loop-var (? bound-low-o) (? bound-high-o)
+					  (? body-o))
+				     (?? b))
+				  `(,@a
+				    (for ,inner-loop-var ,bound-low-i ,bound-high-i
+					 ,(transform-tree body-o
+							  `(for ,inner-loop-var
+								,bound-low-i
+								,bound-high-i
+								(? body-i))
+							  optimizer-inner
+							  #f))	
+				    ,@b)))
+	      (optimizer-outer c)))))
+	
+    (transform-tree c
+		    `(for ,outer-loop-var (? bound-low-o) (? bound-high-o) (? body-o))
+		    at-loop
+		    #f)))
+
+(define lr-test-1
+  `(for i 0 10
+	((for j 0 10
+	     ((for k 0 10
+		  (
+		   (pp i)
+		   (pp j)
+		   (pp k))))))))
+
+(optimize-at lr-test-1 top-level (loop-reorder 'i 'j) #f)
+;;; -> ((for j 0 10 ((for i 0 10 ((for k 0 10 ((pp i) (pp j) (pp k))))))))
+
+(define lr-test-2
+  `(for i 0 10
+	((for z 0 10
+	      (pp z))
+	 (for j 0 10
+	     ((for k 0 10
+		  (
+		   (pp i)
+		   (pp j)
+		   (pp k))))))))
+
+(optimize-at lr-test-2 top-level (loop-reorder 'i 'j) #f)
+;;; -> ((for j 0 10 ((for z 0 10 (pp z)) (for i 0 10 ((for k 0 10 ((pp i) (pp j) (pp k))))))))
