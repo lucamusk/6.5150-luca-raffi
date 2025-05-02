@@ -40,12 +40,13 @@
 ;; Returns nothing of importance
 (define-generic (assign! backend var dims value))
 
-;; Emits a loop statement
-;;   MIN and MAX are rvalues which represent the loop bounds
+;; Emits a for statement
+;;   MIN and MAX are rvalues which represent the bounds
+;;   VAR is the index variable
 ;;   BODY-CONT is a procedure which will get called with no arguments,
 ;;     Any code emitted within this dynamic extent will be in the loop body
 ;; Returns nothing of importance
-(define-generic (loop! backend min max body-cont))
+(define-generic (for! backend var min max body-cont))
 
 ;; Emits an if statement
 ;;   CONDITION is an rvalue on which the conditional will dispatch
