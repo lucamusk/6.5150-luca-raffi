@@ -37,6 +37,7 @@ Shorthand for a few common patterns
      is-that-sym?)))
 
 (register-predicate! list? 'list)
+(register-predicate! procedure? 'procedure)
 
 (define (form obj)
   (is-pair-of
