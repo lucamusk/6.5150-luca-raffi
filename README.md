@@ -7,19 +7,16 @@ SCARY is an array programming language embedded in Scheme as the final project o
 The SCARY frontend language has the following syntax:
 
 ```
-Literal     := Number
-ArrayLit    := (array ArrayLitObj)
-ArrayLitObj := Literal | (ArrayLitObj ...)
-Expr        := Call | Literal | ArrayLit
-Op          := + | * | - | / | Min | Max
-Call        := (Op Expr Expr)
-             | (filter Expr Expr Expr)
-             | (iota Expr)
-             | (ref Expr Expr)
-             | (fold Op Expr Expr)
-             | (reduce Op Expr Expr)
-             | (reorder Expr Expr)
-             | (lift Expr)
+Expr         := Form | Float | Variable
+Op           := + | * | - | / | min | max | < | > | =
+Form         := (Op Expr Expr)
+              | (length Expr)
+              | (ref Expr Expr)
+              | (compute ((Variable : Expr) ...) Expr)
+              | (array Expr ...)
+              | (if Expr Expr Expr)
+              | (fold Op Expr Expr)
+              | (let ((Variable Expr) ...) Expr)
 ```
 
 ## Middle-End
@@ -32,9 +29,8 @@ Func-Call   := (Op Expr Expr) | (length Expr)
 Index       := (ref Variable Expr ...)
 Init        := (declare Variable Expr ...)
 Assignment  := (set! Variable (Expr ...) Expr)
-Statement   := Read | Write | Assignment | Init | Conditional | Loop
-Read        := (read Variable Number)
-Write       := (write Expr)
+Statement   := Assignment | Init | Conditional | Loop | Return
+Return      := (return Expr)
 Conditional := (if Expr (Statement ...) (Statement ...))
 Loop        := (for Variable Expr_min Expr_max Statement ...)
 ```
