@@ -79,6 +79,7 @@ along with SDF.  If not, see <https://www.gnu.org/licenses/>.
 (define (match:segment variable)
   (define (segment-match data dictionary succeed)
     (and (list? data)
+	 (match:satisfies-restriction? variable (car data))
          (let ((binding (match:lookup variable dictionary)))
            (if binding
                (match:segment-equal? data 
@@ -88,6 +89,9 @@ along with SDF.  If not, see <https://www.gnu.org/licenses/>.
                (let ((n (length data)))
                  (let lp ((i 0))
                    (and (<= i n)
+			(or
+			 (= i 0)
+			 (match:satisfies-restriction? variable (list-ref data (- i 1))))
                         (or (succeed (match:extend-dict
                                       variable
                                       (list-head data i)
