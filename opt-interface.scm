@@ -88,52 +88,49 @@ A
 ;;; done on the first or all elements matching the given
 ;;; pattern
 (define (transform-tree tree pattern transformer all?)
- ;; (pp "Transform-tree")
- ;; (pp tree)
- ;; (pp pattern)
+  ;; (pp "Transform-tree")
+  ;; (pp tree)
+  ;; (pp pattern)
   (let ((pattern-compiled (match:compile-pattern pattern))
         (matched? #f))
     (define (traverse-tree current)
-;;      (pp "Traversing")
-;;      (pp current)
+      ;;      (pp "Traversing")
+      ;;      (pp current)
       (if (and matched? (not all?))
           current
           (if (run-matcher pattern-compiled current match:bindings)
               (begin
-;;      (pp "Transforming")
-               (let ((transformed (transformer current)))
-;;        (pp "Transformed")
-;;        (pp transformed)
-                 (if transformed
-                     (set! matched? #t))
-                 transformed))
-           (if (pair? current)
-               (let ((b (traverse-tree (car current)))) ;;; Dig down
+                ;;      (pp "Transforming")
+                (let ((transformed (transformer current)))
+                  ;;        (pp "Transformed")
+                  ;;        (pp transformed)
+                  (if transformed
+                      (set! matched? #t))
+                  transformed))
+              (if (pair? current)
+                  (let ((b (traverse-tree (car current)))) ;;; Dig down
              ;;; Need two lets since the traversal of r
              ;;; depends on b (via matched?)
-                 (let ((r (traverse-tree (cdr current)))) ;;; Dig across
+                    (let ((r (traverse-tree (cdr current)))) ;;; Dig across
                ;;; Final check to allow recursive transformation, i.e. transform
                ;;; a transformed section if it now matches. Useful for constant
                ;;; propogation
-;;            (pp "attempted to transform tree")
-                   (let ((final (cons (if b b (car current)) (if r r (cdr current)))))
-;;          (pp "Transformed tree")
-;;          (pp final)
-;;          (pp all?)
-;;          (pp (run-matcher pattern-compiled final match:bindings))
-                     (if (and all? (run-matcher pattern-compiled final match:bindings))
-                      (begin
-                        ;;(pp "Transforming final tree")
-;;                (pp (transformer final))
-                        (transformer final))
-                      final))))
+                      ;;            (pp "attempted to transform tree")
+                      (let ((final (cons (if b b (car current)) (if r r (cdr current)))))
+                        ;;          (pp "Transformed tree")
+                        ;;          (pp final)
+                        ;;          (pp all?)
+                        ;;          (pp (run-matcher pattern-compiled final match:bindings))
+                        (if (and all? (run-matcher pattern-compiled final match:bindings))
+                            (begin
+                              ;;(pp "Transforming final tree")
+                              ;;                (pp (transformer final))
+                              (transformer final))
+                            final)))))
 
 
-            current))))
-    (let ((result (traverse-tree tree)))
-      (if matched?
-       result
-       #f))))
+              current))
+      (and matched? (traverse-tree tree)))))
 
 ;;; Performs a deep copy of a given tree, with transformations
 ;;; done on the first subtree beginning with an element that
@@ -148,8 +145,8 @@ A
               current
               (if (run-matcher pattern-compiled (car current) match:bindings)
                   (begin
-                   (set! matched? #t)
-                   (transformer current))
+                    (set! matched? #t)
+                    (transformer current))
                   (let ((v (traverse-tree (car current)))) ;;; Dig down
                     (cons v (traverse-tree (cdr current)))))))) ;;; Dig across
     (traverse-tree tree)))
@@ -211,12 +208,12 @@ A
       (if (= n 1)
           (transform-tree code target optimizer all?)
           (transform-subtree code target
-                          (lambda (c)
-                            (cons (car c)
-                                  (optimize-at (cdr c)
-                                               (nth-location target (- n 1))
-                                               optimizer
-                                   all?))))))))
+                             (lambda (c)
+                               (cons (car c)
+                                     (optimize-at (cdr c)
+                                                  (nth-location target (- n 1))
+                                                  optimizer
+                                                  all?))))))))
 
 (define test-sequences
   `((for i 0 10
@@ -226,9 +223,8 @@ A
     (for i 0 10
       (pp "nice!"))))
 
-(optimize-at test-sequences (nth-location `(for i 0 10 (? block)) 2) (lambda (c)
-                                                                       'cool)
-         #f)
+(optimize-at test-sequences (nth-location `(for i 0 10 (? block)) 2) (lambda (c) 'cool)
+             #f)
 ;;; -> ((for i 0 10 (pp "wow")) cool (for i 0 10 (pp "nice!")))
 
 (define-generic-procedure-handler optimize-at
@@ -238,43 +234,38 @@ A
           (scope-index (block-scope-index location))
           (inner-pattern (block-inner-pattern location)))
       (transform-tree code target-block
-              (lambda (b)
-               (pp (list-ref b scope-index))
-               (let ((list-left
-                      (if (= scope-index 0)
-                       '()
-                       (sublist b 0 scope-index)))
-                     (list-right
-                      (sublist b (+ scope-index 1) (length b)))
-                     (optimized
-                      (optimize-at (list-ref b scope-index) inner-pattern optimizer all?)))
-                 (if optimized
-                     (append list-left
-                         (cons
-                          optimized
-                          list-right))
-                     #f)))
-
-
-              #f))))
+                      (lambda (b)
+                        (pp (list-ref b scope-index))
+                        (let ((list-left
+                               (if (= scope-index 0)
+                                   '()
+                                   (sublist b 0 scope-index)))
+                              (list-right
+                               (sublist b (+ scope-index 1) (length b)))
+                              (optimized
+                               (optimize-at (list-ref b scope-index) inner-pattern optimizer all?)))
+                          (if optimized
+                              (append list-left
+                                      (cons
+                                       optimized
+                                       list-right))
+                              #f)))
+                      #f))))
 
 (define top-level
   `(? code))
 
 ;;; Simple block test
 (define test-blocks-1
-  `((for i 0 10 (
-                 (pp i)
+  `((for i 0 10 ((pp i)
                  (pp "hey")))))
 
 (optimize-at test-blocks-1 (block `(for i 0 10 (? block)) 4 `(pp i)) (lambda (c) 'cool) #f)
 
 ;;; Ensures if we match 1 block but not its contents, we still keep matching
 (define test-blocks-2
-  `((for i 0 10 (
-                 (pp "wow")))
-    (for i 0 10 (
-                 (pp i)
+  `((for i 0 10 ((pp "wow")))
+    (for i 0 10 ((pp i)
                  (pp "hey")))))
 
 (optimize-at test-blocks-2 (block `(for i 0 10 (? block)) 4 `(pp i)) (lambda (c) 'cool) #f)
@@ -310,39 +301,39 @@ A
   ;;; the same, that's the programmer's burden
   ;;; Numeric bounds
   (attach-rule! optimizer
-        (rule `(((?? a)
-                 (for ,loop-1 (? bound-low-1, number?) (? bound-high-1) (? body-1))
-                 (?? b)
-                 (for ,loop-2 (? bound-low-2, number?) (? bound-high-2) (? body-2))
-                 (?? c)))
-              `(,@a
-                (for ,loop-1 ,bound-low-1 ,bound-high-1
-                     (,body-1
-                      ,(default-value
-                        (optimize-at body-2 loop-2
-                                (rename loop-2 `(+ ,loop-1 ,(- bound-low-2 bound-low-1)))
-                                #t)
-                        body-2)))
-                ,@b
-                ,@c)))
+                (rule `(((?? a)
+                         (for ,loop-1 (? bound-low-1, number?) (? bound-high-1) (? body-1))
+                         (?? b)
+                         (for ,loop-2 (? bound-low-2, number?) (? bound-high-2) (? body-2))
+                         (?? c)))
+                      `(,@a
+                        (for ,loop-1 ,bound-low-1 ,bound-high-1
+                          (,body-1
+                           ,(default-value
+                              (optimize-at body-2 loop-2
+                                           (rename loop-2 `(+ ,loop-1 ,(- bound-low-2 bound-low-1)))
+                                           #t)
+                              body-2)))
+                        ,@b
+                        ,@c)))
 
   ;;; One or more symbolic bounds
   (attach-rule! optimizer
-        (rule `(((?? a)
-                 (for ,loop-1 (? bound-low-1) (? bound-high-1) (? body-1))
-                 (?? b)
-                 (for ,loop-2 (? bound-low-2) (? bound-high-2) (? body-2))
-                 (?? c)))
-              `(,@a
-                (for ,loop-1 ,bound-low-1 ,bound-high-1
-                     (,body-1
-                      ,(default-value
-                        (optimize-at body-2 loop-2
-                               (rename loop-2 `(+ ,loop-1 (- ,bound-low-2 ,bound-low-1)))
-                               #t)
-                        body-2)))
-                ,@b
-                ,@c)))
+                (rule `(((?? a)
+                         (for ,loop-1 (? bound-low-1) (? bound-high-1) (? body-1))
+                         (?? b)
+                         (for ,loop-2 (? bound-low-2) (? bound-high-2) (? body-2))
+                         (?? c)))
+                      `(,@a
+                        (for ,loop-1 ,bound-low-1 ,bound-high-1
+                          (,body-1
+                           ,(default-value
+                              (optimize-at body-2 loop-2
+                                           (rename loop-2 `(+ ,loop-1 (- ,bound-low-2 ,bound-low-1)))
+                                           #t)
+                              body-2)))
+                        ,@b
+                        ,@c)))
 
   optimizer)
 
@@ -412,8 +403,7 @@ A
 
 ;;; Tests if we change the loop variables
 (define lf-test-6
-  `(
-    (for i 0 10
+  `((for i 0 10
      (pp i))
     (for j 0 10
      (pp j j j))))
@@ -430,12 +420,12 @@ A
                          (?? b)))
                       `(,@a
                         (for ,loop-var 0 ,(/ (- bound-high bound-low) tile-factor)
-                             (for ,(symbol loop-var loop-var)
+                          (for ,(symbol loop-var loop-var)
                               (* ,loop-var ,tile-factor)
                               (+ (* ,loop-var ,tile-factor) ,tile-factor)
-                              ,(optimize-at body loop-var
-                                    (rename loop-var (symbol loop-var loop-var))
-                                    #t)))
+                            ,(optimize-at body loop-var
+                                          (rename loop-var (symbol loop-var loop-var))
+                                          #t)))
                         ,@b)))
 
   ;;; Symbolic bounds
@@ -445,12 +435,12 @@ A
                          (?? b)))
                       `(,@a
                         (for ,loop-var 0 (/ (- ,bound-high ,bound-low) ,tile-factor)
-                             (for ,(symbol loop-var loop-var)
+                          (for ,(symbol loop-var loop-var)
                               (* ,loop-var ,tile-factor)
                               (+ (* ,loop-var ,tile-factor) ,tile-factor)
-                              ,(optimize-at body loop-var
-                                    (rename loop-var (symbol loop-var loop-var))
-                                    #t)))
+                            ,(optimize-at body loop-var
+                                          (rename loop-var (symbol loop-var loop-var))
+                                          #t)))
                         ,@b)))
   optimizer)
 
@@ -463,7 +453,7 @@ A
 
 (define lt-test-2
   `((for i x y
-     (pp i))))
+      (pp i))))
 (optimize-at lt-test-2 top-level (loop-tile 5) #f)
 ;;; -> ((for i 0 (/ (- y x) 5) (for ii (* i 5) (+ (* i 5) 5) (pp ii))))
 
@@ -472,8 +462,7 @@ A
   ;;; into shallower scopes
   (lambda (c)
     (define (at-loop outer-loop)
-      (let (
-            (bound-low-o (caddr outer-loop))
+      (let ((bound-low-o (caddr outer-loop))
             (bound-high-o (cadddr outer-loop))
             (inner-loop (search-tree outer-loop
                                      `(for ,inner-loop-var (? bound-low-i) (? bound-high-i) (? body-i))
@@ -507,16 +496,15 @@ A
               (optimizer-outer c)))))
 
     (transform-tree c
-            `(for ,outer-loop-var (? bound-low-o) (? bound-high-o) (? body-o))
-            at-loop
-            #f)))
+                    `(for ,outer-loop-var (? bound-low-o) (? bound-high-o) (? body-o))
+                    at-loop
+                    #f)))
 
 (define lr-test-1
   `(for i 0 10
      ((for j 0 10
         ((for k 0 10
-           (
-            (pp i)
+           ((pp i)
             (pp j)
             (pp k))))))))
 
@@ -609,10 +597,10 @@ A
          (entry-value (cadr entry))
          (assignment-entry (
                             (member-procedure (lambda (v o)
-                                               (equal? (car o) v))) entry-key assignments)))
+                                                (equal? (car o) v))) entry-key assignments)))
     (if assignment-entry
-     (cons entry (delete (car assignment-entry) assignments))
-     (cons entry assignments))))
+        (cons entry (delete (car assignment-entry) assignments))
+        (cons entry assignments))))
 
 (add-entry `() `(x 5))
 ;;; -> ((x 5))
@@ -672,16 +660,16 @@ A
   `(ref x (ref y (ref z 1))))
 
 (optimize-at atr-test-2 `(ref (? var) (?? indices, number?))
-         (assignments-to-replacer `(((x 8) 5) ((y 4) 8) ((z 1) 4))) #t)
+             (assignments-to-replacer `(((x 8) 5) ((y 4) 8) ((z 1) 4))) #t)
 ;;; -> 5
 
 (define atr-test-3
   `(ref x (ref y (ref z 1))))
 (optimize-at atr-test-3 `(ref (? var) (?? indices, number?))
-         (assignments-to-replacer `(((y 4) 8) ((z 1) 4))) #t)
+             (assignments-to-replacer `(((y 4) 8) ((z 1) 4))) #t)
 ;;; -> (ref x 8)
 
-(optimize-at `(a a a a a b a a b) `((?? a) b) (lambda (c) 'cool) #f)t
+(optimize-at `(a a a a a b a a b) `((?? a) b) (lambda (c) 'cool) #f)
 
 #|
 Expr         := Literal | Variable | Call | Index
@@ -749,20 +737,18 @@ Loop         := (for Variable Expr_min Expr_max Statement ...)
     (pp "CP for set ops")
     (define cp-optimizer (make-pattern-operator))
     (attach-rule! cp-optimizer
-          (rule `((set! (? var) ((?? index-exprs)) (? value-expr)))
-            (let ((indices-processed
-                   (map
-                    (lambda (e)
-                      (let-values (((c a) (constant-propagation-generic e
-                                                assignments)))
-                        c))
-                    index-exprs))
-                  (value-processed
-                   (let-values (((c a) (constant-propagation-generic value-expr
-                                             assignments)))
-                     c)))
-              (pp "Returning from cp opt")
-              `(set! ,var (,@indices-processed) ,value-processed))))
+                  (rule `((set! (? var) ((?? index-exprs)) (? value-expr)))
+                        (let ((indices-processed
+                               (map
+                                (lambda (e)
+                                  (let-values (((c a) (constant-propagation-generic e assignments)))
+                                    c))
+                                index-exprs))
+                              (value-processed
+                               (let-values (((c a) (constant-propagation-generic value-expr assignments)))
+                                 c)))
+                          (pp "Returning from cp opt")
+                          `(set! ,var (,@indices-processed) ,value-processed))))
 
     (define assignment-optimizer (make-pattern-operator))
     ;;; We know what the set is doing and can adjust our assignments accordingly
@@ -776,7 +762,7 @@ Loop         := (for Variable Expr_min Expr_max Statement ...)
      assignment-optimizer
      (rule `((set! (? var) ((?? indicies, number?)) (? value)))
            (values `(set! ,var (,@indicies) ,value)
-                (delete-key assignments (cons var indicies)))))
+                   (delete-key assignments (cons var indicies)))))
     ;;; We know nothing, and have to throw out all the variables assignments
     (attach-rule!
      assignment-optimizer
@@ -834,15 +820,16 @@ Loop         := (for Variable Expr_min Expr_max Statement ...)
   (match-args cond-statement? any)
   (lambda (code assignments)
     (define cp-optimizer (make-pattern-operator))
-    (attach-rule! cp-optimizer
-          (rule `((if (? cond-expr) (? t-s) (? f-s)))
-            (let-values
-                (((cond-c cond-a) (constant-propagation-generic cond-expr assignments)))
-              (let-values
-                  (((t-c t-a) (constant-propagation-generic t-s cond-a))
-                   ((f-c f-a) (constant-propagation-generic f-s cond-a)))
-                (values `(if ,cond-c ,t-c ,f-c)
-                    (intersection-assignments t-a f-a))))))
+    (attach-rule!
+     cp-optimizer
+     (rule `((if (? cond-expr) (? t-s) (? f-s)))
+           (let-values
+               (((cond-c cond-a) (constant-propagation-generic cond-expr assignments)))
+             (let-values
+                 (((t-c t-a) (constant-propagation-generic t-s cond-a))
+                  ((f-c f-a) (constant-propagation-generic f-s cond-a)))
+               (values `(if ,cond-c ,t-c ,f-c)
+                       (intersection-assignments t-a f-a))))))
 
     (cp-optimizer code)))
 
@@ -873,23 +860,24 @@ Loop         := (for Variable Expr_min Expr_max Statement ...)
   (match-args loop-statement? any)
   (lambda (code assignments)
     (define cp-optimizer (make-pattern-operator))
-    (attach-rule! cp-optimizer
-          (rule `((for (? loop-var) (? min) (? max) (? loop-body)))
-            (let-values
-                (((min-c min-a) (constant-propagation-generic min assignments)))
-              (let-values
-                  (((max-c max-a) (constant-propagation-generic max min-a)))
-                (let-values
-                 (((loop-c loop-a) (constant-propagation-generic loop-body max-a)))
+    (attach-rule!
+     cp-optimizer
+     (rule `((for (? loop-var) (? min) (? max) (? loop-body)))
+           (let-values
+               (((min-c min-a) (constant-propagation-generic min assignments)
+                 (let-values)
+                 (((max-c max-a) (constant-propagation-generic max min-a)
+                   (let-values)
+                   (((loop-c loop-a) (constant-propagation-generic loop-body max-a)))))
                  (values `(for ,loop-var ,min-c ,max-c ,loop-c)
-                     loop-a))))))
+                              loop-a))))))
 
     (let loop ((c code) (a assignments))
       (let-values
-       (((code-new assi-new) (cp-optimizer c)))
-       (if (equal? a assi-new)
-           (values code-new assi-new)
-           (loop code-new assi-new))))))
+          (((code-new assi-new) (cp-optimizer c)))
+        (if (equal? a assi-new)
+            (values code-new assi-new)
+            (loop code-new assi-new))))))
 
 (constant-propagation-generic
  `(for i 0 (ref x) (write (ref y 5 10)))
