@@ -10,7 +10,8 @@ Shorthand for a few common patterns
        body ...)
      (define-syntax name
        (syntax-rules ()
-         ((name arg ...) body ...))))))
+         ((name arg ...)
+          (begin body ...)))))))
 
 (define-syntax define-generic
   (syntax-rules ()
