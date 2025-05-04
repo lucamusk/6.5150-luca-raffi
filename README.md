@@ -12,11 +12,12 @@ Op           := + | * | - | / | min | max | < | > | =
 Form         := (Op Expr Expr)
               | (length Expr)
               | (ref Expr Expr)
-              | (compute ((Variable : Expr) ...) Expr)
-              | (array Expr ...)
+              | (compute ((Variable Expr) ...) Expr)
+              | (array Expr Expr ...)
+              | (empty Float)
               | (if Expr Expr Expr)
               | (fold Op Expr Expr)
-              | (let ((Variable Expr) ...) Expr)
+              | (let* ((Variable Expr) ...) Expr)
 ```
 
 ## Middle-End
