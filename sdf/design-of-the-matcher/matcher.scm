@@ -79,7 +79,6 @@ along with SDF.  If not, see <https://www.gnu.org/licenses/>.
 (define (match:segment variable)
   (define (segment-match data dictionary succeed)
     (and (list? data)
-	 (match:satisfies-restriction? variable (car data))
          (let ((binding (match:lookup variable dictionary)))
            (if binding
                (match:segment-equal? data 
