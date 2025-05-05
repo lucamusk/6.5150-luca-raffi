@@ -30,9 +30,6 @@
 ;;; done on the first or all elements matching the given
 ;;; pattern
 (define (transform-tree tree pattern count transformer all?)
-  (pp "Transform-tree")
-  (pp tree)
-  (pp pattern)
   (let ((pattern-compiled (match:compile-pattern pattern))
         (matched? #f))
     (define (handle-no-match current)
@@ -44,32 +41,19 @@
               ;;; Final check to allow recursive transformation, i.e. transform
               ;;; a transformed section if it now matches. Useful for constant
               ;;; propogation
-              ;;;            (pp "attempted to transform tree")
               (let ((final (cons (if b b (car current)) (if r r (cdr current)))))
-                ;;          (pp "Transformed tree")
-                ;;          (pp final)
-                ;;          (pp all?)
-                ;;          (pp (run-matcher pattern-compiled final match:bindings))
                 (if (and all? (run-matcher pattern-compiled final match:bindings))
                     (begin
-                      ;;(pp "Transforming final tree")
-                      ;;                (pp (transformer final))
                       (transformer final))
                     final))))
 	  current))
     (define (traverse-tree current)
-      (pp "Traversing")
-      (pp current)
-      (pp count)
       (if (and matched? (not all?))
           current
           (if (run-matcher pattern-compiled current match:bindings)
 	      (if (<= count 1)
 		  (begin
-                    (pp "Transforming")
                     (let ((transformed (transformer current)))
-                      (pp "Transformed")
-                      (pp transformed)
                       (if transformed
 			  (set! matched? #t))
                       transformed))
@@ -151,7 +135,7 @@
                                     optimized)
                            #f)))
                    #f))))
-
+o
 (define top-level
   `(? code))
 
@@ -423,7 +407,6 @@ Loop         := (for Variable Expr_min Expr_max Statement ...)
 (define-generic-procedure-handler constant-propagation-generic
   (match-args (form 'set!) any-object?)
   (lambda (code assignments)
-    (pp "CP for set ops")
     (define cp-optimizer (make-pattern-operator))
     (attach-rule! cp-optimizer
                   (rule `((set! (? var) ((?? index-exprs)) (? value-expr)))
@@ -471,7 +454,7 @@ Loop         := (for Variable Expr_min Expr_max Statement ...)
 ;;; (if Expr (statement ...) (statement ...))
 (define-generic-procedure-handler constant-propagation-generic
   (match-args (form 'if) any-object?)
-  (lambda (code assignments)
+e  (lambda (code assignments)
     (define cp-optimizer (make-pattern-operator))
     (attach-rule!
      cp-optimizer
