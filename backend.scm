@@ -131,17 +131,3 @@
            (compile-expr! backend mn)
            (compile-expr! backend mx)
            (lambda () (compile-block! backend st))))))
-
-(define-method (compile-statement! (backend any-object?) (obj (form 'read)))
-  (pmatch obj
-    ((read (? var) (? num))
-     (assert (symbol? var))
-     (assert (non-negative-fixnum? num))
-     (read! backend var num))))
-
-(define-method (compile-statement! (backend any-object?) (obj (form 'write)))
-  (pmatch obj
-    ((write (? val))
-     (write! backend (compile-expr! backend val)))))
-
-;; TODO: Define the rest of the traversal
