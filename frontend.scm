@@ -315,9 +315,10 @@ as defined by the grammar.
       (let ((resulting-statements
              (with-new-scope
               (lambda ()
+                (emit! `(declare ,sym))
                 (cont sym)
                 (car (*statements*))))))
-        (emit! `(for ,sym ,low ,high ,@resulting-statements)))))
+        (emit! `(for ,sym ,low ,high ,@(reverse resulting-statements))))))
    ((>= low high)      #t)
    ((= low (+ 1 high)) (with-new-scope (lambda () (cont low))))))
 
@@ -325,7 +326,7 @@ as defined by the grammar.
   (if (null? dimensions)
       (emit! `(set! ,destination (,@destination-indicies ,@indicies) ,(scary:ref source indicies)))
       (emit-for! 0
-                 (car dimenstions)
+                 (car dimensions)
                  (lambda (var)
                    (copy-values! (cdr dimensions)
                                  destination-indicies
@@ -387,7 +388,9 @@ as defined by the grammar.
                           (push-to-scope! (cons var '()) *declarations*)
                           (compile-ir! body (malloc-exactly subterm-size (list var) dest prefix))
                           (car (*statements*))))))
-         (emit! `(for ,var 0 ,val ,@new-block))))
+         (let ((val-sym (gensym 'val-sym)))
+           (compile-ir! val (malloc-whatever val-sym))
+           (emit! `(for ,var 0 ,val-sym ,@(reverse new-block))))))
       ((let* (((? var) (? val))) (? body))
        (compile-ir! val
                     (lambda (size)
@@ -401,7 +404,7 @@ as defined by the grammar.
          (compile-ir! arr (malloc-whatever array-tmp))
          (let*-values (((size)       (cdr (lookup array-tmp)))
                        ((var prefix) (malloc size)))
-           (copy-values! size prefix '() `(ref ,array-tmp ,idx-tmp) var))))
+           (copy-values! size prefix '() (scary:ref array-tmp (list idx-tmp)) var))))
       ((if (? test) (? on-true) (? on-false))
        (let-values (((test-tmp)                 (gensym 'test-tmp))
                     ((result-var result-prefix) (malloc '())))
@@ -415,6 +418,8 @@ as defined by the grammar.
                               (compile-ir! on-false (malloc-exactly '() '() result-var reusult-prefix))
                               (car (*statements*))))))
            (emit! `(if ,test-tmp ,true-code ,false-code)))))
+      ((length (array (?? xs)))
+       (compile-ir! (length xs) malloc))
       ((length (? obj))
        (let-values (((obj-tmp)            (gensym 'obj-tmp))
                     ((res-var res-prefix) (malloc '())))
@@ -425,10 +430,10 @@ as defined by the grammar.
                     ((res-var res-prefix) (malloc '())))
          (compile-ir! arr (malloc-whatever arr-tmp))
          (compile-ir! zero (malloc-exactly '() '() res-var res-prefix))
-         (emit-for! 0 '(length ,arr-tmp)
+         (emit-for! 0 `(length ,arr-tmp)
                     (lambda (counter)
-                      (compile-ir! `(op (ref ,res-var . ,res-prefix)
-                                        (ref ,arr-tmp counter))
+                      (compile-ir! `(,op ,(scary:ref res-var res-prefix)
+                                         ,(scary:ref arr-tmp (list counter)))
                                    (malloc-exactly '() '() res-var res-prefix))))))
       (((? op) (? left) (? right))
        (let-values (((left-tmp)           (gensym 'left-tmp))
