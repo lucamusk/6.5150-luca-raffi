@@ -67,7 +67,8 @@ Shorthand for a few common patterns
 
 ;; Returns (all but the last element) and (the last element) of a list
 (define (rdc+rac lst)
-  (split-at lst (- (length lst) 1)))
+  (define-values (rdc rac-list) (split-at lst (- (length lst) 1)))
+  (values rdc (car rac-list)))
 
 #|
 Defines a paramorphism, which is an abstract way of walking over
@@ -92,13 +93,14 @@ and use the arguments as they see fit (including recursively).
 |#
 (define (make-tree-walker name splitters combiner)
   (define (default-impl . args)
-    (combiner
-     args
+    (apply
+     combiner
      (apply map
             proc
             (map (cut <> <>)
                  splitters
-                 args))))
+                 args))
+     args))
 
   (define proc (simple-generic-procedure name
                                          (length splitters)
@@ -110,3 +112,6 @@ and use the arguments as they see fit (including recursively).
   (define pair (cons obj '()))
   (set-cdr! pair pair)
   pair)
+
+(define-syntax-rule (define-list (id ...) expr)
+  (define-values (id ...) (apply values expr)))
