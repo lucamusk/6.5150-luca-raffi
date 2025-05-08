@@ -5,7 +5,7 @@
 
 ;; Runs all the global tests
 (define (run-all-tests!)
-  (for-each (cut <>) (*tests*)))
+  (for-each (cut <>) (reverse (*tests*))))
 
 ;; Signal that an application of TOPLEVEL-FORM to ARGUMENTS has failed
 (define (check-failure toplevel-form arguments)
