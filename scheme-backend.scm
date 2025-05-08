@@ -46,12 +46,14 @@ A scheme backend for SCARY
 (define-method (length! (backend scheme-backend?) (obj any-object?))
   `(tensor-length ,obj))
 
-(define-method (reference! (backend scheme-backend?) (var symbol?))
-  var)
+(define-method (reference! (backend scheme-backend?) (var symbol?) (dims list?))
+  `(tensor-ref ,var (list ,@dims)))
+
+(define-method (return! (backend scheme-backend?) (var symbol?) (dims list?))
+  `(tensor-ref ,var (list ,@dims)))
 
 (define-method (declare! (backend scheme-backend?) (var symbol?) (exprs list?))
-  (emit! backend `(define ,var (allocate-tensor . ,exprs)))
-  (swap-statements! backend (cut zip-child <> 1)))
+  (emit! backend `(define ,var (allocate-tensor . ,exprs))))
 
 (define-method (assign! (backend scheme-backend?) (var symbol?) (dims list?) (val any-object?))
   (emit! backend `(tensor-write! ,var (list . ,dims) ,val)))
@@ -80,6 +82,3 @@ A scheme backend for SCARY
   (alternatives-cont)
   (swap-statements! backend (compose zip-parent zip-parent)))
 
-(define-method (write! (backend scheme-backend?) (obj any-object?))
-  (emit! backend `(display ,obj))
-  (emit! backend `(newline)))

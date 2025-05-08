@@ -56,6 +56,9 @@
 ;;     Any code emitted within this dynamic extent will be in the alternative of the conditional
 (define-generic (if! backend condition consequence-cont alternative-cont))
 
+;; TODO: document
+(define-generic (return! backend condition consequence-cont alternative-cont))
+
 ;; Emits a read statement, reading a RANK-dimensional tensor into VAR
 ;;   VAR is an lvalue
 ;;   RANK is a compile-time constant
@@ -77,7 +80,7 @@
   (literal! backend num))
 
 (define-method (compile-expr! (backend any-object?) (sym symbol?))
-  (reference! backend sym))
+  sym)
 
 (define-method (compile-expr! (backend any-object?) (obj (form 'length)))
   (length! backend (compile-expr! backend (second obj))))
@@ -131,3 +134,8 @@
            (compile-expr! backend mn)
            (compile-expr! backend mx)
            (lambda () (compile-block! backend st))))))
+
+(define-method (compile-statement! (backend any-object?) (obj (form 'return)))
+  (pmatch obj
+    ((return (? val))
+     (return! backend val))))

@@ -53,7 +53,7 @@ Shorthand for a few common patterns
 (define-syntax pmatch
   (syntax-rules ()
     ((pmatch obj)
-     (error 'pmatch "No pattern matched" obj))
+     (error 'pmatch "No pattern matched" 'obj obj))
     ((pmatch obj (pat res ...) more ...)
      ((rule `pat (begin res ...))
       obj
