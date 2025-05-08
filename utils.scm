@@ -110,3 +110,9 @@ and use the arguments as they see fit (including recursively).
   (define pair (cons obj '()))
   (set-cdr! pair pair)
   pair)
+
+;; Compose multiple functions
+(define compose
+  (let ((compose₂ compose))
+    (lambda xs
+      (reduce-left compose₂ values xs))))
