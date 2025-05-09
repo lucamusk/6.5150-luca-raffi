@@ -9,7 +9,7 @@
             (inner-loop (search-tree outer-loop
                                      `(for ,inner-loop-var (? bound-low-i) (? bound-high-i) (? body-i))
                                      id-succ)))
-        (if (equal? inner-loop #f)
+        (if (not inner-loop)
             outer-loop ;;; Not a match, keep searching
             (let ((bound-low-i (caddr inner-loop))
                   (bound-high-i (cadddr inner-loop)))

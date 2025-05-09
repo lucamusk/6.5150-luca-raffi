@@ -5,9 +5,9 @@
   (pp "join assignments")
   (pp assi-1)
   (pp assi-2)
-  (if (= (length assi-1) 0)
+  (if (null? assi-1)
       assi-2
-      (if (= (length assi-2) 0)
+      (if (null assi-2)
           assi-1
           (let* ((entry (car assi-1))
                  (entry-key (car entry))
@@ -245,7 +245,7 @@ Loop         := (for Variable Expr_min Expr_max Statement ...)
   (and
    (pair? l)
    (not (pair? (car l)))
-   (not (there-exists? reserved-keywords (lambda (k) (equal? k (car l)))))))
+   (not (memq (car l) reserved-keywords))))
 
 ;;; (call Expr ...)
 (define-generic-procedure-handler constant-propagation-generic

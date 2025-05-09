@@ -132,10 +132,9 @@
                             (sublist b (+ scope-index 1) (length b)))
                            (optimized
                             (optimize-at (list-tail b scope-index) inner-pattern optimizer all?)))
-                       (if optimized
+                       (and optimized
                            (append list-left
-                                    optimized)
-                           #f)))
+                                    optimized))))
                    #f))))
 
 (define top-level
