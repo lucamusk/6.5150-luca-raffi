@@ -203,7 +203,7 @@ as defined by the grammar.
      (define-list (body-lifted body-rank) (explicitly-lift body new-ranks))
      (define values-lifted/values-ranks (map (compose (cut explicitly-lift <> ranks) second)
                                              bindings))
-     (unless (every zero? (map second values-lifted/values-ranks))
+     (unless (every (compose zero? second) values-lifted/values-ranks)
        (error "Every bound on a COMPUTE block must be a scalar:" expr))
      (list (replace-subexpressions expr (append (map first values-lifted/values-ranks) (list body-lifted)))
            (+ 1 body-rank)))))
@@ -315,7 +315,7 @@ as defined by the grammar.
       (let ((resulting-statements
              (with-new-scope
               (lambda ()
-                (emit! `(declare ,sym))
+                (push-to-scope! `(,sym . ()) *declarations*)
                 (cont sym)
                 (car (*statements*))))))
         (emit! `(for ,sym ,low ,high ,@(reverse resulting-statements))))))
@@ -340,15 +340,21 @@ as defined by the grammar.
      ((assq var (car decls)) => cdr)
      (else (loop (cdr decls))))))
 
-
 (define ((malloc-exactly size index var prefix) request)
   (check (equal? size request))
   (values var (append prefix index)))
 
 (define ((malloc-whatever where) amount)
-  (emit! `(declare ,where . ,amount))
+  (define amount-vars (map compile! amount))
+  (emit! `(declare ,where . ,amount-vars))
   (values where '()))
 
+(define (compile! expr)
+  (define result-var (gensym 'result))
+  (compile-ir! expr (malloc-whatever result-var))
+  result-var)
+
+;; This should be rewritten as generic procedures
 (define (compile-ir! expr malloc)
   (cond
     ((number? expr)
@@ -361,19 +367,21 @@ as defined by the grammar.
     (else
      (pmatch expr
        ((array (? arg1) (?? arg-rest))
-        (let*-values (((subterm-size)
+        (let*-values (((rank) (+ 1 (length arg-rest)))
+                      ((subterm-size-exprs)
                        (call/cc
                          (lambda (return)
-                            (compile-ir! arg1 return))))
-                      ((var prefix) (malloc (cons (length arg-rest) subterm-size))))
+                           (compile-ir! arg1 return))))
+                      ((subterm-size-vars) (map compile! subterm-size-exprs))
+                      ((var prefix)        (malloc (cons rank subterm-size-vars))))
           (for-each
            (lambda (subterm i)
-            (compile-ir! subterm (malloc-exactly subterm-size (list i) var prefix)))
+            (compile-ir! subterm (malloc-exactly subterm-size-vars (list i) var prefix)))
            (cons arg1 arg-rest)
-           (iota (+ 1 (length arg-rest))))
+           (iota rank))
           (values var (append prefix (list 0)))))
       ((compute (((? var) (? val))) (? body))
-       (let*-values (((subterm-size)
+       (let*-values (((subterm-size-expr)
                       (call/cc
                        (lambda (return)
                          (with-new-scope
@@ -381,16 +389,15 @@ as defined by the grammar.
                             (emit! `(declare ,var))
                             (emit! `(set! ,var () 0))
                             (compile-ir! body return))))))
-                     ((dest prefix) (malloc (cons val subterm-size)))
+                     ((subterm-size-vars) (map compile! subterm-size-expr))
+                     ((dest prefix) (malloc (cons val subterm-size-vars)))
                      ((new-block)
                       (with-new-scope
                         (lambda ()
                           (push-to-scope! (cons var '()) *declarations*)
-                          (compile-ir! body (malloc-exactly subterm-size (list var) dest prefix))
+                          (compile-ir! body (malloc-exactly subterm-size-vars (list var) dest prefix))
                           (car (*statements*))))))
-         (let ((val-sym (gensym 'val-sym)))
-           (compile-ir! val (malloc-whatever val-sym))
-           (emit! `(for ,var 0 ,val-sym ,@(reverse new-block))))))
+         (emit! `(for ,var 0 ,(compile! val) ,@(reverse new-block)))))
       ((let* (((? var) (? val))) (? body))
        (compile-ir! val
                     (lambda (size)
@@ -449,7 +456,7 @@ as defined by the grammar.
   (*declarations* '(()))
   (compile-ir! expr (malloc-whatever final-result))
   (emit! `(return ,final-result))
-  (reverse (apply append (*statements*))))
+  `(begin . ,(reverse (apply append (*statements*)))))
 
 (define (run-frontend code)
   (define-list (stx rank) (explicitly-lift code '()))

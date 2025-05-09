@@ -86,7 +86,9 @@ A scheme backend for SCARY
 
 (define (ir->scheme obj)
   (define backend (make-scheme-backend))
-  (compile-block! backend obj)
+  (if (symbol? (car obj))
+      (compile-statement! backend obj)
+      (compile-block! backend obj))
   (scheme-backend-code backend))
 
 (define-test simple-indexing
@@ -133,3 +135,10 @@ A scheme backend for SCARY
          (set! result2 () (+ result2 (* (ref x ii) (ref z ii))))))
        (return (* result1 result2))))
   (check (= 108.0 (eval (ir->scheme program) (nearest-repl/environment)))))
+
+(define-test dot-product-test
+  (load "./frontend.scm")
+  (define example-program '(fold + 0 (* (array 0 1 2) (array 10 9 8))))
+  (check (= 25.0
+            (eval (ir->scheme (run-frontend example-program))
+                  (nearest-repl/environment)))))

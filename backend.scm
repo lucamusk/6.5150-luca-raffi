@@ -97,6 +97,9 @@
 (define-binop 'min minimize!)
 (define-binop 'max maximize!)
 
+(define-method (compile-statement! (backend any-object?) (obj (form 'begin)))
+  (compile-block! backend (cdr obj)))
+
 (define-method (compile-statement! (backend any-object?) (obj (form 'declare)))
   (pmatch obj
     ((declare (? var) (?? dims))
