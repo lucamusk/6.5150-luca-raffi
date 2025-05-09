@@ -21,7 +21,7 @@
 ;;   VAL is an rvalue which evaluates to a tensor
 (define-generic (length! backend val))
 
-;; Emits a reference expression
+;; Emits an array reference expression
 ;;   VAR is an lvalue which is to be read from
 ;;   DIMS are a list of rvalues, representing the indicies
 ;; Returns an rvalue
@@ -56,17 +56,9 @@
 ;;     Any code emitted within this dynamic extent will be in the alternative of the conditional
 (define-generic (if! backend condition consequence-cont alternative-cont))
 
-;; TODO: document
-(define-generic (return! backend condition consequence-cont alternative-cont))
-
-;; Emits a read statement, reading a RANK-dimensional tensor into VAR
-;;   VAR is an lvalue
-;;   RANK is a compile-time constant
-(define-generic (read! backend var rank))
-
-;; Emits a write statement, printing VAL
-;;   VAL is an rvalue
-(define-generic (write! backend val))
+;; Emits a return clause, returning RESULT
+;;   RESULT is an rvalue
+(define-generic (return! backend result))
 
 ;;; Derived functions for the compiler
 
@@ -80,7 +72,7 @@
   (literal! backend num))
 
 (define-method (compile-expr! (backend any-object?) (sym symbol?))
-  sym)
+  (reference! backend sym '()))
 
 (define-method (compile-expr! (backend any-object?) (obj (form 'length)))
   (length! backend (compile-expr! backend (second obj))))
@@ -138,4 +130,4 @@
 (define-method (compile-statement! (backend any-object?) (obj (form 'return)))
   (pmatch obj
     ((return (? val))
-     (return! backend val))))
+     (return! backend (compile-expr! backend val)))))
