@@ -1,8 +1,14 @@
 (load "./opt-interface.scm")
+(load "./loop-fusion.scm")
+(load "./loop-tiling.scm")
+(load "./loop-reordering.scm")
+(load "./constant-propagation.scm")
+
+;; TRANSFORM TREE
 (transform-tree `((b 0 (1 2 0)) a (1 (b 2) 3)) `((? b) 2) 1 (lambda (t) 'cool) #f)
 ;;; -> ((b 0 (1 2 0)) a (1 cool 3))
 
-
+;; BLOCK LOCATIONS
 ;;; Simple block test
 (define test-blocks-1
   `((for i 0 10
@@ -31,7 +37,7 @@
 	     (lambda (c) 'cool) #f)
 ;;; -> ((for i 0 10 (for j 0 10 cool)))
 	     
-
+;; NTH LOCATIONS
 (define test-sequences
   `((for i 0 10
       (pp "wow"))
@@ -44,7 +50,7 @@
              #f)
 ;;; -> ((for i 0 10 (pp "wow")) cool (for i 0 10 (pp "nice!")))
 
-;;; Let's combine them!
+;; COMBINED LOCATIONS
 (define test-combo-1
   `((for i 0 10
 	(for j 0 10
@@ -76,7 +82,7 @@
       (for j 0 10
 	   (set! z (i j) 0))))
 |#
-
+x
 (define test-combo-2
   `((for i 0 10
 	 (for j 0 10
@@ -99,7 +105,7 @@
 (optimize-at test-sequences 'i (rename 'i 'j) #t)
 ;;; -> ((for j 0 10 (pp "wow")) (for j 0 10 (pp "hey")) (for j 0 10 (pp "nice!")))
 
-
+;; LOOP FUSION
 ;;; Simple test for correctness
 (define lf-test-1
   '((for i 0 10
@@ -173,19 +179,22 @@
 (optimize-at lf-test-6 top-level (loop-fuser 'i 'j) #f)
 ;;; -> ((for i 0 10 ((pp i) (pp i i i))))
 
+
+;; LOOP TILING
 (define lt-test-1
-  `((for i 0 10
-     (pp i))))
+  `(for i 0 10
+     (pp i)))
 (optimize-at lt-test-1 top-level (loop-tile 5) #f)
 ;;; -> ((for i 0 2 (for ii (* i 5) (+ (* i 5) 5) (pp ii))))
 
 (define lt-test-2
-  `((for i x y
-      (pp i))))
+  `(for i x y
+      (pp i)))
 (optimize-at lt-test-2 top-level (loop-tile 5) #f)
 ;;; -> ((for i 0 (/ (- y x) 5) (for ii (* i 5) (+ (* i 5) 5) (pp ii))))
 
 
+;; LOOP REORDERING
 (define lr-test-1
   `(for i 0 10
      ((for j 0 10
@@ -210,6 +219,7 @@
 (optimize-at lr-test-2 top-level (loop-reorder 'i 'j) #f)
 ;;; -> ((for j 0 10 ((for z 0 10 (pp z)) (for i 0 10 ((for k 0 10 ((pp i) (pp j) (pp k))))))))
 
+;; CONSTANT PROPAGATION
 (join-assignments `((x 5) (y 6) (z 7)) `())
 ;;; -> ((x 5) (y 6) (z 7))
 (join-assignments `() `())
@@ -300,34 +310,11 @@
 ;;; -> (set! x (1 2 3) 5)
 ;;; -> (((x 1 2 3) 5))
 
-(constant-propagation-generic `(write (ref x 1 2 3)) `(((x 1 2 3) 5)))
-;;; -> (write 5)
-;;; -> (((x 1 2 3) 5))
-
-(constant-propagation-generic
- `(if (ref x 1) (write (ref x 2)) (write (ref x 3)))
- `(((x 1) 0) ((x 2) 1)))
-;;; -> (if 0 (write 1) (write (ref x 3)))
-;;; -> (((x 1) 0) ((x 2) 1))
-
-(constant-propagation-generic
- `(if (ref x 1) (set! x (2) 5) (write (ref x 3)))
- `(((x 1) 0) ((x 2) 1)))
-;;; -> (if 0 (set! x (2) 5) (write (ref x 3)))
-;;; -> (((x 1) 0))
-
 (constant-propagation-generic
  `(if (ref x 1) (set! x (2) 5) (set! x (2) 5))
  `(((x 1) 0) ((x 2) 1)))
 ;;; -> (if 0 (set! x (2) 5) (set! x (2) 5))
 ;;; -> (((x 1) 0) ((x 2) 5))
-
-
-(constant-propagation-generic
- `(for i 0 (ref x) (write (ref y 5 10)))
- `(((x) 5) ((y 5 10) 3)))
-;;; -> (for i 0 5 (write 3))
-;;; -> (((x) 5) ((y 5 10) 3))
 
 (constant-propagation-generic
  `(for i 0 10 (set! x (i) 0))
@@ -382,7 +369,7 @@
 ;;; -> (((x) 2))
 
 
-(optimize-at
+(pp (optimize-at
  `((declare len-v)
    (set! len-v () 5)
    (declare x (ref len-v))
@@ -396,7 +383,7 @@
    (return r))
  top-level
  constant-propagation-optimizer
- #f)
+ #f))
 #|
 ((declare len-v)
  (set! len-v () 5)
@@ -412,3 +399,65 @@
 		(ref y (ref i))))))
 (return r))
 |#
+
+
+;; EXAMPLE REAL WORLD TEST
+(define demo-test
+  `(
+    (declare a 5)
+    (set! a (0) 1)
+    (set! a (1) 2)
+    (set! a (2) 3)
+    (set! a (3) 4)
+    (set! a (4) 5)
+    
+    (declare b 5)
+    (set! b (0) 1)
+    (set! b (1) 0)
+    (set! b (2) 1)
+    (set! b (3) 0)
+    (set! b (4) 1)
+    
+    (declare x 4)
+    (set! x (0) 5)
+    (set! x (1) 8)
+    (set! x (2) 4)
+    (set! x (3) 1)
+    
+    (declare y 4)
+    (set! y (0) 4)
+    (set! y (1) -2)
+    (set! y (2) 1)
+    (set! y (3) 4)
+    
+    (declare result1)
+
+    (set! result1 () 0)
+    (for i 0 (max (length a) (length b))
+	 (set! result1 () (+ result1 (* (ref a i) (ref b i)))))
+    
+    (declare result2)
+    
+    (set! result2 () 0)
+    (for i 0 (max (length x) (length y))
+	 (set! result2 () (+ result2 (* (ref x i) (ref y i)))))
+    
+    (return (* result1 result2))))
+
+(pp (optimize-at demo-test `(for i 0 (? max) (?? body)) (loop-tile 2) #f))
+
+(define after-tile  
+  (optimize-at demo-test
+	     (nth-location
+	      `(for i 0 (? max) (?? body))
+	      2)
+	     (loop-tile 2)
+	     #f))
+
+(define after-rename
+  (optimize-at after-tile
+	       'b
+	       (rename 'b 'include-vec)
+	       #t))
+
+(pp after-rename)
