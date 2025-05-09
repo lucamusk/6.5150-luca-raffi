@@ -88,6 +88,9 @@ along with SDF.  If not, see <https://www.gnu.org/licenses/>.
                (let ((n (length data)))
                  (let lp ((i 0))
                    (and (<= i n)
+			(or
+			 (= i 0)
+			 (match:satisfies-restriction? variable (list-ref data (- i 1))))
                         (or (succeed (match:extend-dict
                                       variable
                                       (list-head data i)
