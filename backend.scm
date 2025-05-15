@@ -65,7 +65,7 @@
 (define-generic (compile-statement! backend statement))
 (define-generic (compile-expr! backend expr))
 
-(define (compile-block! backend block)
+(define-generic (compile-block! backend block)
   (for-each (cut compile-statement! backend <>) block))
 
 (define-method (compile-expr! (backend any-object?) (num integer?))

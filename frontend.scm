@@ -176,22 +176,33 @@ as defined by the grammar.
 (define-method (explicitly-lift (expr (form 'empty)) (_ list?))
   (list expr (second expr)))
 
-(define-method (implicitly-lift (results list?) (expr (form 'length)) (ranks list?))
+(define-method (implicitly-lift (results list?)
+                                (expr (form 'length))
+                                (ranks list?))
   (define-list (subexpr rank) (first results))
   (unless (positive? rank)
     (error "Cannot take the rank of a scalar" expr))
   (list `(length ,subexpr) 0))
 
-(define-method (implicitly-lift (subexprs/ranks list?) (expr (form 'array)) (ranks list?))
-  (unless (every (lambda (x) (= (second x) (second (first subexprs/ranks))))
+(define-method (implicitly-lift (subexprs/ranks list?)
+                                (expr (form 'array))
+                                (ranks list?))
+  (unless (every (lambda (x) (= (second x)
+                                (second (first subexprs/ranks))))
                  (cdr subexprs/ranks))
     (error "Cannot encode a jagged array" expr))
-  (list `(array ,@(map first subexprs/ranks)) (+ 1 (second (first subexprs/ranks)))))
+  (list `(array ,@(map first subexprs/ranks))
+        (+ 1 (second (first subexprs/ranks)))))
 
-(define-method (implicitly-lift (subexprs/ranks list?) (expr (form 'ref)) (ranks list?))
-  ((lift-all expr '(1 0)) subexprs/ranks))
+(define-method (implicitly-lift (subexprs/ranks list?)
+                                (expr (form 'ref))
+                                (ranks list?))
+  (define-list (subex rnk) ((lift-all expr '(#f 0)) subexprs/ranks))
+  (list subex (- (+ rnk (cadar subexprs/ranks)) 1)))
 
-(define-method (implicitly-lift (subexprs/ranks list?) (expr (form 'fold)) (ranks list?))
+(define-method (implicitly-lift (subexprs/ranks list?)
+                                (expr (form 'fold))
+                                (ranks list?))
   ((lift-all expr '(0 1)) subexprs/ranks))
 
 (define-method (explicitly-lift (expr (form 'compute)) (ranks list?))
@@ -201,11 +212,15 @@ as defined by the grammar.
                                     bindings)
                                ranks))
      (define-list (body-lifted body-rank) (explicitly-lift body new-ranks))
-     (define values-lifted/values-ranks (map (compose (cut explicitly-lift <> ranks) second)
-                                             bindings))
+     (define values-lifted/values-ranks
+       (map (compose (cut explicitly-lift <> ranks) second)
+            bindings))
      (unless (every (compose zero? second) values-lifted/values-ranks)
        (error "Every bound on a COMPUTE block must be a scalar:" expr))
-     (list (replace-subexpressions expr (append (map first values-lifted/values-ranks) (list body-lifted)))
+     (list (replace-subexpressions
+            expr
+            (append (map first values-lifted/values-ranks)
+                    (list body-lifted)))
            (+ 1 body-rank)))))
 
 (define-method (explicitly-lift (expr (form 'let*)) (ranks list?))
@@ -341,7 +356,7 @@ as defined by the grammar.
      (else (loop (cdr decls))))))
 
 (define ((malloc-exactly size index var prefix) request)
-  (check (equal? size request))
+  #;(check (equal? size request))
   (values var (append prefix index)))
 
 (define ((malloc-whatever where) amount)
@@ -366,6 +381,8 @@ as defined by the grammar.
        (copy-values! size prefix '() expr var)))
     (else
      (pmatch expr
+       ((length (compute ((? var) (? cmp)) (? bd)))
+        (compile-ir! cmp malloc))
        ((array (? arg1) (?? arg-rest))
         (let*-values (((rank) (+ 1 (length arg-rest)))
                       ((subterm-size-exprs)

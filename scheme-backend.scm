@@ -89,7 +89,8 @@ A scheme backend for SCARY
   (if (symbol? (car obj))
       (compile-statement! backend obj)
       (compile-block! backend obj))
-  (scheme-backend-code backend))
+  `((lambda ()
+      ,(scheme-backend-code backend))))
 
 (define-test simple-indexing
   (define program
@@ -99,6 +100,7 @@ A scheme backend for SCARY
       (return a)))
   (equal? (eval (ir->scheme program) (nearest-repl/environment)
            #(#(0. 0. 0. 0. 0. 0. 0.) #(0. 1. 0. 0. 0. 0. 0.) #(0. 0. 2. 0. 0. 0. 0.)))))
+
 
 (define-test lucas-example
   (define program
@@ -142,3 +144,10 @@ A scheme backend for SCARY
   (check (= 25.0
             (eval (ir->scheme (run-frontend example-program))
                   (nearest-repl/environment)))))
+
+(define example-program
+  '(begin
+     (declare a 3 5)
+     (for i 0 3
+       (set! a (i) 9))
+     (return a)))

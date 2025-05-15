@@ -13,7 +13,7 @@
              (start    (array-start arr)))
     (if (pair? indices)
         (let* ((element-size (apply * (cdr shape)))
-               (start        (+ start (* (car indices) element-size))))
+               (start        (+ start (* (modulo (car indices) (car shape)) element-size))))
           (loop (cdr indices) (cdr shape) start))
         (values shape start))))
 
@@ -43,7 +43,7 @@
              (start start))
     (if (null? shape)
         (flo:vector-set! (array-elements arr) (inexact->exact start) (->flonum val))
-        (for-each (lambda (i) (loop (cdr shape) (+ start (* i (car shape)))))
+        (for-each (lambda (i) (loop (cdr shape) (+ start (apply * i (cdr shape)))))
                   (iota (car shape))))))
 
 (define (array->vector-of-vectors arr)
